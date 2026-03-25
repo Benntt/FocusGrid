@@ -52,15 +52,20 @@ const MOTIVATIONAL = [
 ];
 
 const DEFAULT_GROUPS = [
-  { id: "full-sail", name: "Full Sail", emoji: "💼", colorIdx: 2, collapsed: false },
-  { id: "twitch", name: "Twitch", emoji: "🎮", colorIdx: 0, collapsed: false },
-  { id: "personal", name: "Personal", emoji: "🏠", colorIdx: 3, collapsed: false },
+  {"id":"full-sail","name":"Full Sail","emoji":"💼","colorIdx":2,"collapsed":false},
+  {"id":"twitch","name":"DamnitBennett","emoji":"🎮","colorIdx":5,"collapsed":false},
+  {"id":"personal","name":"Home Projects","emoji":"🏠","colorIdx":3,"collapsed":false},
+  {"name":"Arcadian Glitch","emoji":"🚀","colorIdx":7,"id":"1774479052773","collapsed":false},
 ];
 
 const UNGROUPED_ID = "__ungrouped__";
 
-// Bennett's real projects migrated from v3, assigned to groups
 const MIGRATED_PROJECTS = [
+  {"id":1774479151607,"name":"roof","notes":"","priority":"medium","colorIdx":0,"groupId":"personal","tasks":[],"aiSummary":null,"createdAt":1774479151607},
+  {"id":1774479138295,"name":"whereisvulture","notes":"","priority":"medium","colorIdx":0,"groupId":"1774479052773","tasks":[],"aiSummary":null,"createdAt":1774479138295},
+  {"id":1774479093706,"name":"creative agency","notes":"","priority":"medium","colorIdx":1,"groupId":"1774479052773","tasks":[],"aiSummary":null,"createdAt":1774479093706},
+  {"id":1774479063839,"name":"whereisxur","notes":"","priority":"medium","colorIdx":0,"groupId":"1774479052773","tasks":[],"aiSummary":null,"createdAt":1774479063839},
+  {"id":1774479026097,"name":"New fence","notes":"","priority":"medium","colorIdx":0,"groupId":"personal","tasks":[],"aiSummary":null,"createdAt":1774479026097},
   {"id":1774470525125,"name":"Valhallan Esports","notes":"Casters","priority":"medium","colorIdx":0,"tasks":[],"aiSummary":null,"createdAt":1774470525125,"groupId":"full-sail"},
   {"id":1774470510314,"name":"NACE Casters","notes":"","priority":"medium","colorIdx":0,"tasks":[],"aiSummary":null,"createdAt":1774470510314,"groupId":"full-sail"},
   {"id":1774470269156,"name":"Special Olympics","notes":"Build out the pitch, run of show, and streamer contract.","priority":"medium","colorIdx":1,"tasks":[],"aiSummary":null,"createdAt":1774470269156,"groupId":"full-sail"},
@@ -146,23 +151,191 @@ function Toggle({ checked, onChange, color }) {
   );
 }
 
-function TaskRow({ task, onCycle, onDelete }) {
-  const [hov, setHov] = useState(false);
-  const s = STATUS_CONFIG[task.status];
+// ─── Attachments ──────────────────────────────────────────────────────────────
+
+function getLinkIcon(url) {
+  if (!url) return "🔗";
+  if (url.includes("drive.google.com") || url.includes("docs.google.com") || url.includes("sheets.google.com")) return "📊";
+  if (url.includes("notion.so") || url.includes("notion.site")) return "🗒️";
+  if (url.includes("figma.com")) return "🎨";
+  if (url.includes("github.com")) return "💻";
+  if (url.includes("youtube.com") || url.includes("youtu.be")) return "▶️";
+  if (url.includes("dropbox.com")) return "📦";
+  if (url.includes(".pdf")) return "📄";
+  return "🔗";
+}
+
+function AttachmentsSection({ attachments = [], onUpdate }) {
+  const [addingLink, setAddingLink] = useState(false);
+  const [addingNote, setAddingNote] = useState(false);
+  const [linkForm, setLinkForm] = useState({ label: "", url: "" });
+  const [noteForm, setNoteForm] = useState("");
+  const [editingNote, setEditingNote] = useState(null);
+
+  const addLink = () => {
+    if (!linkForm.url.trim()) return;
+    const url = linkForm.url.startsWith("http") ? linkForm.url : "https://" + linkForm.url;
+    const newItem = { id: Date.now(), type: "link", label: linkForm.label || url, url, createdAt: Date.now() };
+    onUpdate([...attachments, newItem]);
+    setLinkForm({ label: "", url: "" }); setAddingLink(false);
+  };
+
+  const addNote = () => {
+    if (!noteForm.trim()) return;
+    const newItem = { id: Date.now(), type: "note", content: noteForm.trim(), createdAt: Date.now() };
+    onUpdate([...attachments, newItem]);
+    setNoteForm(""); setAddingNote(false);
+  };
+
+  const saveNote = (id, content) => {
+    onUpdate(attachments.map(a => a.id === id ? { ...a, content } : a));
+    setEditingNote(null);
+  };
+
+  const remove = (id) => onUpdate(attachments.filter(a => a.id !== id));
+
+  const links = attachments.filter(a => a.type === "link");
+  const notes = attachments.filter(a => a.type === "note");
+
   return (
-    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 10, background: hov ? C.bg : "transparent", transition: "background 0.15s", marginBottom: 2 }}>
-      <button onClick={() => onCycle(task.id)} style={{
-        width: 22, height: 22, borderRadius: "50%", border: `2px solid ${s.color}`,
-        background: task.status === "done" ? s.color : "transparent",
-        cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s",
-      }}>
-        {task.status === "done" && <span style={{ color: "#fff", fontSize: 11 }}>✓</span>}
-        {task.status === "in-progress" && <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.color, display: "block" }} />}
-      </button>
-      <span style={{ flex: 1, fontSize: 14, color: task.status === "done" ? C.textSoft : C.text, textDecoration: task.status === "done" ? "line-through" : "none", transition: "color 0.15s" }}>{task.text}</span>
-      <span style={{ fontSize: 12, color: C.textSoft, whiteSpace: "nowrap" }}>{task.mins}m</span>
-      {hov && <button onClick={() => onDelete(task.id)} style={{ background: "none", border: "none", color: C.textSoft, cursor: "pointer", fontSize: 16, padding: "0 2px" }}>×</button>}
+    <div style={{ marginTop: 12 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.textSoft, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+        Attachments {attachments.length > 0 && `(${attachments.length})`}
+      </div>
+
+      {/* Links */}
+      {links.map(item => (
+        <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", background: C.bg, borderRadius: 10, marginBottom: 6, border: `1.5px solid ${C.border}` }}>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>{getLinkIcon(item.url)}</span>
+          <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, fontSize: 13, color: C.violet, fontWeight: 600, textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+            onMouseEnter={e => e.target.style.textDecoration = "underline"}
+            onMouseLeave={e => e.target.style.textDecoration = "none"}
+          >{item.label}</a>
+          <button onClick={() => remove(item.id)} style={{ background: "none", border: "none", color: C.textSoft, cursor: "pointer", fontSize: 15, padding: "0 2px", flexShrink: 0 }}>×</button>
+        </div>
+      ))}
+
+      {/* Notes */}
+      {notes.map(item => (
+        <div key={item.id} style={{ padding: "10px 12px", background: C.amberLight, borderRadius: 10, marginBottom: 6, border: `1.5px solid ${C.amberMid}` }}>
+          {editingNote === item.id ? (
+            <div>
+              <textarea defaultValue={item.content} id={`note-edit-${item.id}`} rows={3}
+                style={{ width: "100%", border: `1.5px solid ${C.amber}`, borderRadius: 8, padding: "8px", fontSize: 13, color: C.text, outline: "none", resize: "none", boxSizing: "border-box", background: C.surface, marginBottom: 8 }} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => saveNote(item.id, document.getElementById(`note-edit-${item.id}`).value)} style={{ background: C.amber, border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 12, padding: "6px 14px", cursor: "pointer" }}>Save</button>
+                <button onClick={() => setEditingNote(null)} style={{ background: "none", border: `1.5px solid ${C.borderMid}`, borderRadius: 8, color: C.textMid, fontSize: 12, padding: "6px 10px", cursor: "pointer" }}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+              <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>📝</span>
+              <span style={{ flex: 1, fontSize: 13, color: C.text, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{item.content}</span>
+              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                <button onClick={() => setEditingNote(item.id)} style={{ background: "none", border: "none", color: C.textSoft, cursor: "pointer", fontSize: 13, padding: "0 2px" }}>✏️</button>
+                <button onClick={() => remove(item.id)} style={{ background: "none", border: "none", color: C.textSoft, cursor: "pointer", fontSize: 15, padding: "0 2px" }}>×</button>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Add link form */}
+      {addingLink && (
+        <div style={{ padding: "12px", background: C.violetLight, borderRadius: 10, marginBottom: 8, border: `1.5px solid ${C.violetMid}` }}>
+          <input value={linkForm.url} onChange={e => setLinkForm({ ...linkForm, url: e.target.value })}
+            placeholder="Paste URL (Google Drive, Notion, website...)"
+            onKeyDown={e => e.key === "Enter" && addLink()}
+            autoFocus
+            style={{ width: "100%", border: `1.5px solid ${C.violet}`, borderRadius: 8, padding: "8px 10px", fontSize: 13, color: C.text, outline: "none", boxSizing: "border-box", marginBottom: 8, background: C.surface }}
+          />
+          <input value={linkForm.label} onChange={e => setLinkForm({ ...linkForm, label: e.target.value })}
+            placeholder="Label (optional — e.g. 'Q2 Budget Sheet')"
+            style={{ width: "100%", border: `1.5px solid ${C.borderMid}`, borderRadius: 8, padding: "8px 10px", fontSize: 13, color: C.text, outline: "none", boxSizing: "border-box", marginBottom: 10, background: C.surface }}
+          />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={addLink} style={{ background: C.violet, border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 13, padding: "7px 16px", cursor: "pointer" }}>Add link</button>
+            <button onClick={() => { setAddingLink(false); setLinkForm({ label: "", url: "" }); }} style={{ background: "none", border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.textMid, fontSize: 13, padding: "7px 12px", cursor: "pointer" }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Add note form */}
+      {addingNote && (
+        <div style={{ padding: "12px", background: C.amberLight, borderRadius: 10, marginBottom: 8, border: `1.5px solid ${C.amberMid}` }}>
+          <textarea value={noteForm} onChange={e => setNoteForm(e.target.value)} autoFocus
+            placeholder="Type your note here..."
+            rows={4}
+            style={{ width: "100%", border: `1.5px solid ${C.amber}`, borderRadius: 8, padding: "8px 10px", fontSize: 13, color: C.text, outline: "none", resize: "none", boxSizing: "border-box", marginBottom: 10, background: C.surface }}
+          />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={addNote} style={{ background: C.amber, border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 13, padding: "7px 16px", cursor: "pointer" }}>Save note</button>
+            <button onClick={() => { setAddingNote(false); setNoteForm(""); }} style={{ background: "none", border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.textMid, fontSize: 13, padding: "7px 12px", cursor: "pointer" }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Add buttons */}
+      {!addingLink && !addingNote && (
+        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+          <button onClick={() => setAddingLink(true)} style={{
+            background: "none", border: `1.5px solid ${C.violetMid}`, borderRadius: 8,
+            color: C.violet, fontSize: 12, fontWeight: 600, padding: "5px 12px", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s",
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = C.violetLight}
+            onMouseLeave={e => e.currentTarget.style.background = "none"}
+          >🔗 Add link</button>
+          <button onClick={() => setAddingNote(true)} style={{
+            background: "none", border: `1.5px solid ${C.amberMid}`, borderRadius: 8,
+            color: C.amber, fontSize: 12, fontWeight: 600, padding: "5px 12px", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s",
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = C.amberLight}
+            onMouseLeave={e => e.currentTarget.style.background = "none"}
+          >📝 Add note</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TaskRow({ task, onCycle, onDelete, onUpdate }) {
+  const [hov, setHov] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const s = STATUS_CONFIG[task.status];
+  const hasAttachments = (task.attachments || []).length > 0;
+
+  return (
+    <div style={{ marginBottom: 2 }}>
+      <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+        style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 10, background: hov ? C.bg : "transparent", transition: "background 0.15s" }}>
+        <button onClick={() => onCycle(task.id)} style={{
+          width: 22, height: 22, borderRadius: "50%", border: `2px solid ${s.color}`,
+          background: task.status === "done" ? s.color : "transparent",
+          cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s",
+        }}>
+          {task.status === "done" && <span style={{ color: "#fff", fontSize: 11 }}>✓</span>}
+          {task.status === "in-progress" && <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.color, display: "block" }} />}
+        </button>
+        <span style={{ flex: 1, fontSize: 14, color: task.status === "done" ? C.textSoft : C.text, textDecoration: task.status === "done" ? "line-through" : "none", transition: "color 0.15s" }}>{task.text}</span>
+        <span style={{ fontSize: 12, color: C.textSoft, whiteSpace: "nowrap" }}>{task.mins}m</span>
+        {hasAttachments && <span style={{ fontSize: 11, color: C.violet, fontWeight: 600 }}>{task.attachments.length} 📎</span>}
+        {hov && (
+          <button onClick={() => setExpanded(!expanded)} style={{ background: "none", border: "none", color: C.textSoft, cursor: "pointer", fontSize: 12, padding: "0 2px", fontWeight: 600 }}>
+            {expanded ? "▲" : "▼"}
+          </button>
+        )}
+        {hov && <button onClick={() => onDelete(task.id)} style={{ background: "none", border: "none", color: C.textSoft, cursor: "pointer", fontSize: 16, padding: "0 2px" }}>×</button>}
+      </div>
+      {expanded && (
+        <div style={{ paddingLeft: 44, paddingRight: 12, paddingBottom: 8 }}>
+          <AttachmentsSection
+            attachments={task.attachments || []}
+            onUpdate={(newAttachments) => onUpdate({ ...task, attachments: newAttachments })}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -474,7 +647,11 @@ function ProjectCard({ project, onUpdate, onDelete, apiKey, onMove, groupColor }
           <div style={{ marginTop: 12 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: C.textSoft, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Tasks</div>
             {project.tasks.length === 0 && <div style={{ fontSize: 13, color: C.textSoft, padding: "8px 12px" }}>No tasks yet.</div>}
-            {project.tasks.map(task => <TaskRow key={task.id} task={task} onCycle={cycleTask} onDelete={deleteTask} />)}
+            {project.tasks.map(task => (
+              <TaskRow key={task.id} task={task} onCycle={cycleTask} onDelete={deleteTask}
+                onUpdate={(updatedTask) => onUpdate({ ...project, tasks: project.tasks.map(t => t.id === updatedTask.id ? updatedTask : t) })}
+              />
+            ))}
           </div>
           {addingTask ? (
             <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -491,6 +668,12 @@ function ProjectCard({ project, onUpdate, onDelete, apiKey, onMove, groupColor }
               + Add task
             </button>
           )}
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1.5px solid ${C.border}` }}>
+            <AttachmentsSection
+              attachments={project.attachments || []}
+              onUpdate={(newAttachments) => onUpdate({ ...project, attachments: newAttachments })}
+            />
+          </div>
           <div style={{ marginTop: 14 }}>
             {project.aiSummary && (
               <div style={{ padding: "12px 14px", background: C.violetLight, borderRadius: 12, border: `1.5px solid ${C.violetMid}`, marginBottom: 10 }}>
@@ -1023,9 +1206,9 @@ const TABS = [
 ];
 
 export default function App() {
-  const [projects, setProjects] = useLocalState("focusgrid_projects_v4", sampleProjects);
-  const [groups, setGroups] = useLocalState("focusgrid_groups_v4", DEFAULT_GROUPS);
-  const [reminders, setReminders] = useLocalState("focusgrid_reminders_v4", [
+  const [projects, setProjects] = useLocalState("focusgrid_projects_v5", sampleProjects);
+  const [groups, setGroups] = useLocalState("focusgrid_groups_v5", DEFAULT_GROUPS);
+  const [reminders, setReminders] = useLocalState("focusgrid_reminders_v5", [
     { id: 1, text: "Morning project review", time: "09:00", type: "daily", active: true },
     { id: 2, text: "Weekly wrap-up", time: "17:00", type: "weekly", day: "Friday", active: true },
   ]);
